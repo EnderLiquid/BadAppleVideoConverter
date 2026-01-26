@@ -17,7 +17,7 @@ import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.BitSet;
+import java.util.Arrays;
 import java.util.List;
 
 public class BadAppleConverter {
@@ -97,7 +97,8 @@ public class BadAppleConverter {
 
     /**
      * 将视频转换为二进制文件
-     * 文件头字段使用小端顺序储存
+     * 文件头字段字节序为小端顺序
+     * 帧数据位序为LSB First
      * 文件结构:
      * [0-3]   Int   Width
      * [4-7]   Int   Height
@@ -159,10 +160,10 @@ public class BadAppleConverter {
         Mat binaryFrame = new Mat();
         // 用于读取像素数据的临时数组
         byte[] pixels = new byte[targetWidth * targetHeight];
-        // 用于按序储存像素数据的 BitSet
-        BitSet currentFrameBits = new BitSet(targetWidth * targetHeight);
         // 计算每一帧在二进制文件中占用的字节数 (向上取整)
         int bytesPerFrame = (targetWidth * targetHeight + 7) / 8;
+        // 实际写入文件的位打包数组
+        byte[] packedBytes = new byte[bytesPerFrame];
         System.out.println("开始处理...");
         System.out.printf("源: %d * %d @ %.2f fps, 总帧数: %d%n", srcWidth, srcHeight, srcFps, srcTotalFrames);
         System.out.printf("目标: %d * %d @ %.2f fps, 总帧数: %d%n", targetWidth, targetHeight, targetFps, targetTotalFrames);
@@ -188,8 +189,8 @@ public class BadAppleConverter {
                 double currentTime = currentFrameIndex / targetFps;
                 int srcFrameIndex = (int) (currentTime * srcFps);
                 capture.set(Videoio.CAP_PROP_POS_FRAMES, srcFrameIndex);
-                // 清空 BitSet
-                currentFrameBits.clear();
+                // 重置位打包数组
+                Arrays.fill(packedBytes, (byte) 0);
                 if (capture.read(frame) && !frame.empty()) {
                     // 1. 缩放
                     Imgproc.resize(frame, resizedFrame, new Size(targetWidth, targetHeight));
@@ -197,28 +198,29 @@ public class BadAppleConverter {
                     Imgproc.cvtColor(resizedFrame, grayFrame, Imgproc.COLOR_BGR2GRAY);
                     // 3. 二值化 (阈值128, 0黑 255白)
                     Imgproc.threshold(grayFrame, binaryFrame, 128, 255, Imgproc.THRESH_BINARY);
-                    // 4. 获取数据 (覆盖pixels数组)
+                    // 4. 获取像素数据 (覆盖临时数组原有内容)
                     binaryFrame.get(0, 0, pixels);
-                    // 5. 存入 BitSet
+                    // 5. 位打包
                     for (int p = 0; p < pixels.length; p++) {
                         // 将有符号byte (-128 - 127) 转换为无符号int (0 - 255)
                         int val = pixels[p] & 0xFF;
                         // 逻辑: 白色为1, 黑色为0
                         if (val == 255) {
-                            currentFrameBits.set(p);
+                            // 计算当前像素属于哪个 byte (p / 8) 以及该 byte 中的哪一位 (p % 8)
+                            int byteIndex = p / 8;
+                            int bitIndex = p % 8;
+                            // 使用位运算将位打包数组对应位置 1 (位序为LSB First)
+                            packedBytes[byteIndex] |= (byte) (1 << bitIndex);
                         }
                     }
                 } else {
                     System.err.printf("警告: %d / %d 帧为空帧%n", i, targetTotalFrames);
                 }
-                // 6. 转换为 byte 数组并写入文件
-                byte[] fileBytes = new byte[bytesPerFrame];
-                byte[] bitSetBytes = currentFrameBits.toByteArray();
-                System.arraycopy(bitSetBytes, 0, fileBytes, 0, Math.min(bitSetBytes.length, bytesPerFrame));
-                bos.write(fileBytes);
+                // 6. 将位打包数组写入文件
+                bos.write(packedBytes);
                 // 7. 控制台帧预览与进度播报
                 if (i == 1 || i % 100 == 0 || i == targetTotalFrames) {
-                    printBitSetFrame(currentFrameBits, targetWidth, targetHeight);
+                    printFrameFromBytes(packedBytes, targetWidth, targetHeight);
                     System.out.printf("已处理: %d / %d 帧%n", i, targetTotalFrames);
                 }
             }
@@ -235,13 +237,16 @@ public class BadAppleConverter {
     }
 
     // 辅助方法: 控制台打印帧预览
-    private static void printBitSetFrame(BitSet frameBits, int width, int height) {
-        if (frameBits == null) return;
+    private static void printFrameFromBytes(byte[] packedBytes, int width, int height) {
+        if (packedBytes == null) return;
         System.out.println("---- 帧预览 ----");
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++) {
                 int index = y * width + x;
-                boolean isWhite = frameBits.get(index);
+                int byteIndex = index / 8;
+                int bitIndex = index % 8;
+                // 检查对应字节的对应位是否为 1
+                boolean isWhite = (packedBytes[byteIndex] & (1 << bitIndex)) != 0;
                 System.out.print(isWhite ? "#" : " ");
             }
             System.out.println();
