@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bad Apple Binary Player</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #202020;
+            color: #eee;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h1 {
+            margin-bottom: 20px;
+            font-weight: 300;
+        }
+
+        .container {
+            background-color: #333;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            text-align: center;
+            max-width: 90vw;
+        }
+
+        .controls {
+            margin: 15px 0;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .btn {
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 14px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .btn:hover {
+            background-color: #45a049;
+        }
+
+        .btn:disabled {
+            background-color: #555;
+            cursor: not-allowed;
+        }
+
+        .btn-select {
+            background-color: #2196F3;
+        }
+        .btn-select:hover {
+            background-color: #0b7dda;
+        }
+
+        canvas {
+            background-color: #000;
+            border: 2px solid #555;
+            image-rendering: pixelated; /* 保持像素风格 */
+            max-width: 100%;
+            height: auto;
+            margin-top: 10px;
+        }
+
+        .info {
+            margin-top: 10px;
+            font-size: 0.9em;
+            color: #aaa;
+            font-family: monospace;
+        }
+        
+        #fileName {
+            margin-left: 10px;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Bad Apple Binary Player</h1>
+
+    <div class="container">
+        <div class="controls">
+            <label class="btn btn-select">
+                选择 .bin 文件
+                <input type="file" id="fileInput" accept=".bin">
+            </label>
+            <button id="playBtn" class="btn" disabled>播放</button>
+            <button id="pauseBtn" class="btn" disabled>暂停</button>
+            <button id="resetBtn" class="btn" disabled>重置</button>
+        </div>
+        <span id="fileName">未选择文件</span>
+
+        <div class="info" id="metaInfo">
+            等待加载文件...
+        </div>
+
+        <div>
+            <canvas id="screen"></canvas>
+        </div>
+        <div class="info" id="playStatus">Frame: 0 / 0</div>
+    </div>
+
+    <script>
+        // DOM 元素
+        const fileInput = document.getElementById('fileInput');
+        const playBtn = document.getElementById('playBtn');
+        const pauseBtn = document.getElementById('pauseBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const canvas = document.getElementById('screen');
+        const ctx = canvas.getContext('2d');
+        const metaInfo = document.getElementById('metaInfo');
+        const playStatus = document.getElementById('playStatus');
+        const fileNameDisplay = document.getElementById('fileName');
+
+        // 播放器状态
+        let videoData = null; // ArrayBuffer
+        let isPlaying = false;
+        let animationFrameId = null;
+        let lastFrameTime = 0;
+        
+        // 元数据
+        let width = 0;
+        let height = 0;
+        let fps = 0;
+        let totalFrames = 0;
+        let bytesPerFrame = 0;
+        let currentFrame = 0;
+        let headerSize = 16;
+
+        // 预分配的图像数据缓存
+        let imageData = null;
+
+        fileInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            fileNameDisplay.textContent = file.name;
+            const reader = new FileReader();
+
+            reader.onload = function(e) {
+                videoData = e.target.result;
+                parseHeader();
+            };
+
+            reader.readAsArrayBuffer(file);
+        });
+
+        function parseHeader() {
+            if (!videoData || videoData.byteLength < 16) {
+                alert("文件格式错误：文件过小");
+                return;
+            }
+
+            const dataView = new DataView(videoData);
+
+            // 读取文件头 (Little Endian)
+            // [0-3] Width
+            width = dataView.getInt32(0, true);
+            // [4-7] Height
+            height = dataView.getInt32(4, true);
+            // [8-11] FPS
+            fps = dataView.getFloat32(8, true);
+            // [12-15] FrameCount
+            totalFrames = dataView.getInt32(12, true);
+
+            // 计算每一帧的字节数 (ceil(width * height / 8))
+            bytesPerFrame = Math.ceil((width * height) / 8);
+
+            // 校验文件大小
+            const expectedSize = headerSize + (totalFrames * bytesPerFrame);
+            if (videoData.byteLength < expectedSize) {
+                console.warn(`文件大小 (${videoData.byteLength}) 小于预期 (${expectedSize})，可能已损坏。`);
+            }
+
+            // 初始化 Canvas
+            canvas.width = width;
+            canvas.height = height;
+            // 放大显示以便观看（如果分辨率很小）
+            if (width < 400) {
+               canvas.style.width = (width * 4) + 'px'; 
+            } else {
+               canvas.style.width = 'auto';
+            }
+
+            // 初始化 ImageData 对象 (RGBA)
+            imageData = ctx.createImageData(width, height);
+
+            // 更新 UI
+            metaInfo.innerHTML = `分辨率: ${width}x${height} | FPS: ${fps.toFixed(2)} | 总帧数: ${totalFrames} | 数据大小: ${(videoData.byteLength/1024).toFixed(2)} KB`;
+            playStatus.textContent = `Frame: 0 / ${totalFrames}`;
+            
+            enableControls();
+            resetPlayer();
+            renderFrame(0); // 渲染第一帧预览
+        }
+
+        function enableControls() {
+            playBtn.disabled = false;
+            pauseBtn.disabled = true;
+            resetBtn.disabled = false;
+        }
+
+        playBtn.addEventListener('click', () => {
+            if (!videoData) return;
+            isPlaying = true;
+            playBtn.disabled = true;
+            pauseBtn.disabled = false;
+            lastFrameTime = performance.now();
+            loop();
+        });
+
+        pauseBtn.addEventListener('click', () => {
+            isPlaying = false;
+            playBtn.disabled = false;
+            pauseBtn.disabled = true;
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+        });
+
+        resetBtn.addEventListener('click', resetPlayer);
+
+        function resetPlayer() {
+            isPlaying = false;
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+            currentFrame = 0;
+            playBtn.disabled = false;
+            pauseBtn.disabled = true;
+            renderFrame(0);
+        }
+
+        function loop(timestamp) {
+            if (!isPlaying) return;
+
+            const interval = 1000 / fps;
+            const elapsed = timestamp - lastFrameTime;
+
+            // 如果过去的时间大于一帧的时间
+            if (elapsed > interval) {
+                // 计算期间本来应该播多少帧
+                const framesToAdvance = Math.floor(elapsed / interval);
+
+                // 修正时间（保留余数，防止时间漂移）
+                lastFrameTime = timestamp - (elapsed % interval);
+
+                // 跳到当前帧
+                currentFrame += framesToAdvance;
+
+                if (currentFrame < totalFrames) {
+                    // 只渲染当前帧
+                    renderFrame(currentFrame); 
+                } else {
+                    // 播放结束，确保停在最后一帧
+                    renderFrame(totalFrames - 1); 
+                    resetPlayer();
+                    return;
+                }
+            }
+            
+            animationFrameId = requestAnimationFrame(loop);
+        }
+
+
+
+        function renderFrame(frameIndex) {
+            if (!videoData || !imageData) return;
+
+            // 计算当前帧在二进制 buffer 中的起始偏移量
+            const frameOffset = headerSize + (frameIndex * bytesPerFrame);
+            
+            // 安全检查
+            if (frameOffset + bytesPerFrame > videoData.byteLength) return;
+
+            // 获取当前帧的二进制数据
+            const frameBytes = new Uint8Array(videoData, frameOffset, bytesPerFrame);
+            const data = imageData.data; // RGBA 数组
+
+            // 遍历像素并解包
+            for (let i = 0; i < width * height; i++) {
+                // Java 逻辑：
+                // byteIndex = p / 8
+                // bitIndex = p % 8
+                // isWhite = (packedBytes[byteIndex] & (1 << bitIndex)) != 0
+                
+                const byteIndex = Math.floor(i / 8);
+                const bitIndex = i % 8;
+                
+                // 检查对应位是否为 1
+                const isWhite = (frameBytes[byteIndex] & (1 << bitIndex)) !== 0;
+
+                // 设置 Canvas ImageData (RGBA)
+                const imgDataIndex = i * 4;
+                const color = isWhite ? 255 : 0;
+
+                data[imgDataIndex] = color;     // R
+                data[imgDataIndex + 1] = color; // G
+                data[imgDataIndex + 2] = color; // B
+                data[imgDataIndex + 3] = 255;   // Alpha
+            }
+
+            // 将图像数据绘制到 Canvas 上
+            ctx.putImageData(imageData, 0, 0);
+            playStatus.textContent = `Frame: ${frameIndex + 1} / ${totalFrames}`;
+        }
+    </script>
+</body>
+</html>
