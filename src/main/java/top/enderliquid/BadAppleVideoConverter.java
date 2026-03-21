@@ -1,6 +1,7 @@
 package top.enderliquid;
 
 import nu.pattern.OpenCV;
+import org.aeonbits.owner.Accessible;
 import org.aeonbits.owner.Config;
 import org.aeonbits.owner.ConfigFactory;
 import org.opencv.core.Mat;
@@ -27,7 +28,7 @@ public class BadAppleVideoConverter {
     public static final int MAX_FPS = 240;
     public static final String CONFIG_PATH = "./config.properties";
     public static final String DEFAULT_INPUT_PATH = "./input/bad_apple.mp4";
-    public static final String DEFAULT_OUTPUT_PATH = "./output/bad_apple.bin";
+    public static final String DEFAULT_OUTPUT_PATH = "./output/bad_apple_video.bin";
     public static final int DEFAULT_TARGET_WIDTH = 80;
     public static final int DEFAULT_TARGET_HEIGHT = 60;
     public static final double DEFAULT_TARGET_FPS = 10.00;
@@ -37,53 +38,53 @@ public class BadAppleVideoConverter {
     }
 
     @Config.Sources({"file:" + CONFIG_PATH})
-    public interface ConvertConfig extends Config {
+    public interface ConvertConfig extends Accessible {
+        @DefaultValue(DEFAULT_INPUT_PATH)
         String inputPath();
+        @DefaultValue(DEFAULT_OUTPUT_PATH)
         String outputPath();
+        @DefaultValue("" + DEFAULT_TARGET_WIDTH)
         Integer targetWidth();
+        @DefaultValue("" + DEFAULT_TARGET_HEIGHT)
         Integer targetHeight();
+        @DefaultValue("" + DEFAULT_TARGET_FPS)
         Double targetFps();
     }
 
     private static ConvertConfig initConfig() {
         try {
             Path configFilePath = Paths.get(CONFIG_PATH);
+            // 创建配置实例（如果文件不存在，此时里面装的都是 @DefaultValue 的值）
+            ConvertConfig config = ConfigFactory.create(ConvertConfig.class);
             if (!Files.exists(configFilePath)) {
-                System.err.println("错误: 配置文件不存在");
                 // 确保目录存在
                 Files.createDirectories(configFilePath.getParent());
-                // 创建默认配置文件
-                FileWriter writer = new FileWriter(configFilePath.toFile());
-                try (writer) {
-                    writer.write(String.format("inputPath = %s%n", DEFAULT_INPUT_PATH));
-                    writer.write(String.format("outputPath = %s%n", DEFAULT_OUTPUT_PATH));
-                    writer.write(String.format("targetWidth = %d%n", DEFAULT_TARGET_WIDTH));
-                    writer.write(String.format("targetHeight = %d%n", DEFAULT_TARGET_HEIGHT));
-                    writer.write(String.format("targetFps = %.2f%n", DEFAULT_TARGET_FPS));
+                // 使用 Accessible.store() 导出默认值到文件
+                try (FileOutputStream out = new FileOutputStream(configFilePath.toFile())) {
+                    config.store(out, "BadAppleVideoConverter Config");
                 }
                 System.out.println("已创建默认配置文件: " + CONFIG_PATH);
                 System.out.println("请编辑配置文件后重新运行");
                 System.exit(0);
             }
+            // 校验配置参数
+            List<String> invalidFields = new ArrayList<>();
+            if (config.inputPath() == null) invalidFields.add("inputPath");
+            if (config.outputPath() == null) invalidFields.add("outputPath");
+            if (config.targetWidth() == null || config.targetWidth() < 1) invalidFields.add("targetWidth");
+            if (config.targetHeight() == null || config.targetHeight() < 1) invalidFields.add("targetHeight");
+            if (config.targetFps() == null || config.targetFps() <= 0) invalidFields.add("targetFps");
+            if (!invalidFields.isEmpty()) {
+                throw new RuntimeException(
+                        String.format("配置参数错误: %s", String.join(", ", invalidFields))
+                );
+            }
+            return config;
         } catch (IOException e) {
             System.err.println("错误: 初始化配置文件失败: " + e.getMessage());
             System.exit(1);
+            return null; // 不会执行，但编译器需要
         }
-        // 读取配置
-        ConvertConfig config = ConfigFactory.create(ConvertConfig.class);
-        // 校验配置参数
-        List<String> invalidFields = new ArrayList<>();
-        if (config.inputPath() == null) invalidFields.add("inputPath");
-        if (config.outputPath() == null) invalidFields.add("outputPath");
-        if (config.targetWidth() == null || config.targetWidth() < 1) invalidFields.add("targetWidth");
-        if (config.targetHeight() == null || config.targetHeight() < 1) invalidFields.add("targetHeight");
-        if (config.targetFps() == null || config.targetFps() <= 0) invalidFields.add("targetFps");
-        if (!invalidFields.isEmpty()) {
-            throw new RuntimeException(
-                    String.format("配置参数错误: %s", String.join(", ", invalidFields))
-            );
-        }
-        return config;
     }
 
     public static void main(String[] args) {
