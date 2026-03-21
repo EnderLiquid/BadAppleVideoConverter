@@ -20,6 +20,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 
 public class BadAppleVideoConverter {
 
@@ -92,7 +93,12 @@ public class BadAppleVideoConverter {
             ConvertConfig config = initConfig();
             convertVideoToFile(config.inputPath(), config.outputPath(), config.targetWidth(), config.targetHeight(), config.targetFps());
         } catch (RuntimeException e) {
-            System.err.printf("错误: %s%n", e.getMessage());
+            System.err.printf("错误: %s%n%s",
+                    e.getMessage(),
+                    Arrays.stream(e.getStackTrace())
+                            .map(StackTraceElement::toString)
+                            .collect(Collectors.joining(System.lineSeparator()))
+            );
         }
     }
 
