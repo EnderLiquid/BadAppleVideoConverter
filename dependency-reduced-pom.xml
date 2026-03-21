@@ -30,7 +30,7 @@
           <transformers>
             <transformer>
               <manifestEntries>
-                <Main-Class>top.enderliquid.BadAppleConverter</Main-Class>
+                <Main-Class>top.enderliquid.BadAppleVideoConverter</Main-Class>
               </manifestEntries>
             </transformer>
           </transformers>

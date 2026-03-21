@@ -20,7 +20,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-public class BadAppleConverter {
+public class BadAppleVideoConverter {
 
     public static final int MAX_WIDTH = 8192;
     public static final int MAX_HEIGHT = 8192;
