@@ -5,7 +5,7 @@
 ## 功能
 
 - 视频缩放、灰度化、二值化处理
-- 可配置目标分辨率与帧率
+- 可配置目标分辨率、帧率与二值化阈值
 - 位打包压缩输出，节省存储空间
 
 ## 输出格式
@@ -35,6 +35,7 @@ outputPath=./output/bad_apple_video.bin
 targetWidth=80
 targetHeight=60
 targetFps=10.0
+thresholdValue=128
 ```
 
 ## 依赖

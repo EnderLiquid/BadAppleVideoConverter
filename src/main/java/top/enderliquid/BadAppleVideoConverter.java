@@ -27,12 +27,15 @@ public class BadAppleVideoConverter {
     public static final int MAX_WIDTH = 8192;
     public static final int MAX_HEIGHT = 8192;
     public static final int MAX_FPS = 240;
+    public static final int MIN_THRESHOLD = 1;
+    public static final int MAX_THRESHOLD = 254;
+    public static final int DEFAULT_THRESHOLD = 128;
     public static final String CONFIG_PATH = "./config.properties";
     public static final String DEFAULT_INPUT_PATH = "./input/bad_apple.mp4";
     public static final String DEFAULT_OUTPUT_PATH = "./output/bad_apple_video.bin";
-    public static final int DEFAULT_TARGET_WIDTH = 80;
-    public static final int DEFAULT_TARGET_HEIGHT = 60;
-    public static final double DEFAULT_TARGET_FPS = 10.00;
+    public static final int DEFAULT_TARGET_WIDTH = 88;
+    public static final int DEFAULT_TARGET_HEIGHT = 64;
+    public static final double DEFAULT_TARGET_FPS = 30.00;
 
     static {
         OpenCV.loadLocally();
@@ -50,6 +53,8 @@ public class BadAppleVideoConverter {
         Integer targetHeight();
         @DefaultValue("" + DEFAULT_TARGET_FPS)
         Double targetFps();
+        @DefaultValue("" + DEFAULT_THRESHOLD)
+        Integer thresholdValue();
     }
 
     private static ConvertConfig initConfig() {
@@ -75,6 +80,11 @@ public class BadAppleVideoConverter {
             if (config.targetWidth() == null || config.targetWidth() < 1) invalidFields.add("targetWidth");
             if (config.targetHeight() == null || config.targetHeight() < 1) invalidFields.add("targetHeight");
             if (config.targetFps() == null || config.targetFps() <= 0) invalidFields.add("targetFps");
+            if (config.thresholdValue() == null || config.thresholdValue() < MIN_THRESHOLD || config.thresholdValue() > MAX_THRESHOLD) {
+                invalidFields.add(String.format("thresholdValue (must be %d-%d, got: %s)",
+                        MIN_THRESHOLD, MAX_THRESHOLD,
+                        config.thresholdValue() == null ? "null" : config.thresholdValue()));
+            }
             if (!invalidFields.isEmpty()) {
                 throw new RuntimeException(
                         String.format("配置参数错误: %s", String.join(", ", invalidFields))
@@ -91,7 +101,7 @@ public class BadAppleVideoConverter {
     public static void main(String[] args) {
         try {
             ConvertConfig config = initConfig();
-            convertVideoToFile(config.inputPath(), config.outputPath(), config.targetWidth(), config.targetHeight(), config.targetFps());
+            convertVideoToFile(config.inputPath(), config.outputPath(), config.targetWidth(), config.targetHeight(), config.targetFps(), config.thresholdValue());
         } catch (RuntimeException e) {
             System.err.printf("错误: %s%n%s",
                     e.getMessage(),
@@ -113,13 +123,14 @@ public class BadAppleVideoConverter {
      * [12-15] Int   FrameCount
      * [16-N]  Bytes Frame Data (每帧固定字节数)
      *
-     * @param inputPath    视频路径
-     * @param targetWidth  目标宽度
-     * @param targetHeight 目标高度
-     * @param targetFps    目标帧率
-     * @param outputPath   输出的 .bin 文件路径
+     * @param inputPath      视频路径
+     * @param outputPath     输出的 .bin 文件路径
+     * @param targetWidth    目标宽度
+     * @param targetHeight   目标高度
+     * @param targetFps      目标帧率
+     * @param thresholdValue 二值化阈值 (1-254)，值越小越多的像素被判定为白色
      */
-    public static void convertVideoToFile(String inputPath, String outputPath, int targetWidth, int targetHeight, double targetFps) {
+    public static void convertVideoToFile(String inputPath, String outputPath, int targetWidth, int targetHeight, double targetFps, int thresholdValue) {
         Path inputFilePath, outputFilePath;
         try {
             inputFilePath = Paths.get(inputPath);
@@ -174,6 +185,7 @@ public class BadAppleVideoConverter {
         System.out.println("开始处理...");
         System.out.printf("源: %d * %d @ %.2f fps, 总帧数: %d%n", srcWidth, srcHeight, srcFps, srcTotalFrames);
         System.out.printf("目标: %d * %d @ %.2f fps, 总帧数: %d%n", targetWidth, targetHeight, targetFps, targetTotalFrames);
+        System.out.printf("二值化阈值: %d%n", thresholdValue);
         System.out.printf("每帧数据大小: %d bytes%n", bytesPerFrame);
         try {
             Files.createDirectories(outputFilePath.getParent());
@@ -204,7 +216,7 @@ public class BadAppleVideoConverter {
                     // 2. 转换为灰度图
                     Imgproc.cvtColor(resizedFrame, grayFrame, Imgproc.COLOR_BGR2GRAY);
                     // 3. 二值化 (阈值128, 0黑 255白)
-                    Imgproc.threshold(grayFrame, binaryFrame, 128, 255, Imgproc.THRESH_BINARY);
+                    Imgproc.threshold(grayFrame, binaryFrame, thresholdValue, 255, Imgproc.THRESH_BINARY);
                     // 4. 获取像素数据 (覆盖临时数组原有内容)
                     binaryFrame.get(0, 0, pixels);
                     // 5. 位打包
