@@ -287,10 +287,10 @@ public class BadAppleVideoConverter {
         @DefaultValue("2")
         Integer cannyDilateSize();
 
-        @DefaultValue("50.0")
+        @DefaultValue("50.00")
         Double cannyThreshold1();
 
-        @DefaultValue("150.0")
+        @DefaultValue("150.00")
         Double cannyThreshold2();
     }
 }
