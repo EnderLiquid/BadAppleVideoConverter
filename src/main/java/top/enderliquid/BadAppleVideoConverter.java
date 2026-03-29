@@ -56,8 +56,15 @@ public class BadAppleVideoConverter {
             if (config.targetWidth() == null || config.targetWidth() < 1) invalidFields.add("targetWidth");
             if (config.targetHeight() == null || config.targetHeight() < 1) invalidFields.add("targetHeight");
             if (config.targetFps() == null || config.targetFps() <= 0) invalidFields.add("targetFps");
+            if (config.mode() == null) invalidFields.add("mode");
             if (config.thresholdValue() == null || config.thresholdValue() < 0 || config.thresholdValue() > 255)
                 invalidFields.add("thresholdValue");
+            if (config.cannyDilate() == null) invalidFields.add("cannyDilate");
+            if (config.cannyDilateSize() == null || config.cannyDilateSize() < 2) invalidFields.add("cannyDilateSize");
+            if (config.cannyThreshold1() == null || config.cannyThreshold1() < 0 || config.cannyThreshold1() > 255)
+                invalidFields.add("cannyThreshold1");
+            if (config.cannyThreshold2() == null || config.cannyThreshold2() < 0 || config.cannyThreshold2() > 255 || config.cannyThreshold2() <= config.cannyThreshold1())
+                invalidFields.add("cannyThreshold2");
             if (!invalidFields.isEmpty()) {
                 throw new RuntimeException(
                         String.format("配置参数错误: %s", String.join(", ", invalidFields))
