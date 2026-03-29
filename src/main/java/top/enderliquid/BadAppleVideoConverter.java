@@ -51,20 +51,30 @@ public class BadAppleVideoConverter {
             }
             // 校验配置参数
             List<String> invalidFields = new ArrayList<>();
-            if (config.inputPath() == null) invalidFields.add("inputPath");
-            if (config.outputPath() == null) invalidFields.add("outputPath");
-            if (config.targetWidth() == null || config.targetWidth() < 1) invalidFields.add("targetWidth");
-            if (config.targetHeight() == null || config.targetHeight() < 1) invalidFields.add("targetHeight");
-            if (config.targetFps() == null || config.targetFps() <= 0) invalidFields.add("targetFps");
-            if (config.mode() == null) invalidFields.add("mode");
+            if (config.inputPath() == null || config.inputPath().isBlank())
+                invalidFields.add("inputPath");
+            if (config.outputPath() == null || config.outputPath().isBlank())
+                invalidFields.add("outputPath");
+            if (config.targetWidth() == null || config.targetWidth() < 1)
+                invalidFields.add("targetWidth");
+            if (config.targetHeight() == null || config.targetHeight() < 1)
+                invalidFields.add("targetHeight");
+            if (config.targetFps() == null || config.targetFps() <= 0)
+                invalidFields.add("targetFps");
+            if (config.mode() == null)
+                invalidFields.add("mode");
             if (config.thresholdValue() == null || config.thresholdValue() < 0 || config.thresholdValue() > 255)
                 invalidFields.add("thresholdValue");
-            if (config.cannyDilate() == null) invalidFields.add("cannyDilate");
-            if (config.cannyDilateSize() == null || config.cannyDilateSize() < 2) invalidFields.add("cannyDilateSize");
+            if (config.cannyDilate() == null)
+                invalidFields.add("cannyDilate");
+            if (config.cannyDilateSize() == null || config.cannyDilateSize() < 2)
+                invalidFields.add("cannyDilateSize");
             if (config.cannyThreshold1() == null || config.cannyThreshold1() < 0 || config.cannyThreshold1() > 255)
                 invalidFields.add("cannyThreshold1");
-            if (config.cannyThreshold2() == null || config.cannyThreshold2() < 0 || config.cannyThreshold2() > 255 || config.cannyThreshold2() <= config.cannyThreshold1())
+            if (config.cannyThreshold2() == null || config.cannyThreshold2() < 0 || config.cannyThreshold2() > 255)
                 invalidFields.add("cannyThreshold2");
+            if (config.cannyApertureSize() != 3 && config.cannyApertureSize() != 5 && config.cannyApertureSize() != 7)
+                invalidFields.add("cannyApertureSize");
             if (!invalidFields.isEmpty()) {
                 throw new RuntimeException(
                         String.format("配置参数错误: %s", String.join(", ", invalidFields))
@@ -299,5 +309,8 @@ public class BadAppleVideoConverter {
 
         @DefaultValue("150.00")
         Double cannyThreshold2();
+
+        @DefaultValue("3")
+        Integer cannyApertureSize();
     }
 }

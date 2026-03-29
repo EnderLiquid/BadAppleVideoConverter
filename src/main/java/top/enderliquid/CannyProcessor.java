@@ -21,6 +21,7 @@ public class CannyProcessor implements FrameProcessor {
     private boolean dilate;          // 是否膨胀线条
     private double threshold1;       // Canny 低阈值
     private double threshold2;       // Canny 高阈值
+    private int aperture;         // Sobel 算子的孔径大小
 
     @Override
     public void init(int targetWidth, int targetHeight, BadAppleVideoConverter.ConvertConfig config) {
@@ -30,6 +31,7 @@ public class CannyProcessor implements FrameProcessor {
         this.dilate = config.cannyDilate();
         this.threshold1 = config.cannyThreshold1();
         this.threshold2 = config.cannyThreshold2();
+        this.aperture = config.cannyApertureSize();
 
         // 膨胀核大小
         int dilateSize = config.cannyDilateSize();
@@ -56,7 +58,7 @@ public class CannyProcessor implements FrameProcessor {
             // resize(srcFrame, resizedFrameBGR) -> cvtColor -> Canny -> dilate? -> get
             Imgproc.resize(srcFrame, resizedFrameBGR, new Size(targetWidth, targetHeight));
             Imgproc.cvtColor(resizedFrameBGR, grayFrame, Imgproc.COLOR_BGR2GRAY);
-            Imgproc.Canny(grayFrame, edgesFrame, threshold1, threshold2);
+            Imgproc.Canny(grayFrame, edgesFrame, threshold1, threshold2, aperture);
 
             if (dilate) {
                 Imgproc.dilate(edgesFrame, edgesFrame, dilateKernel);
@@ -67,7 +69,7 @@ public class CannyProcessor implements FrameProcessor {
             // 分支 B: 先 Canny 后缩放
             // cvtColor(srcFrame) -> Canny -> dilate? -> resize -> threshold(127) -> get
             Imgproc.cvtColor(srcFrame, grayFrame, Imgproc.COLOR_BGR2GRAY);
-            Imgproc.Canny(grayFrame, edgesFrame, threshold1, threshold2);
+            Imgproc.Canny(grayFrame, edgesFrame, threshold1, threshold2, aperture);
 
             if (dilate) {
                 Imgproc.dilate(edgesFrame, edgesFrame, dilateKernel);
