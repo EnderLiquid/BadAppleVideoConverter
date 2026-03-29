@@ -95,8 +95,6 @@ public class BadAppleVideoConverter {
      * [8-11]  Float FPS
      * [12-15] Int   FrameCount
      * [16-N]  Bytes Frame Data (每帧固定字节数)
-     *
-     * @param config 配置对象，包含所有处理参数
      */
     public static void convertVideoToFile(ConvertConfig config) {
         String inputPath = config.inputPath();
@@ -285,6 +283,9 @@ public class BadAppleVideoConverter {
 
         @DefaultValue("false")
         Boolean cannyDilate();
+
+        @DefaultValue("2")
+        Integer cannyDilateSize();
 
         @DefaultValue("50.0")
         Double cannyThreshold1();

@@ -31,15 +31,18 @@ public class CannyProcessor implements FrameProcessor {
         this.threshold1 = config.cannyThreshold1();
         this.threshold2 = config.cannyThreshold2();
 
+        // 膨胀核大小
+        int dilateSize = config.cannyDilateSize();
+
         // 创建 Mat 对象
         grayFrame = new Mat();
         edgesFrame = new Mat();
         resizedFrameBGR = new Mat();
         resizedFrameGray = new Mat();
 
-        // 若开启膨胀，创建 2x2 矩形核
+        // 若开启膨胀，创建矩形核
         if (dilate) {
-            dilateKernel = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(2, 2));
+            dilateKernel = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(dilateSize, dilateSize));
         }
 
         // 初始化输出像素数组
