@@ -1,4 +1,4 @@
-package top.enderliquid;
+package top.enderliquid.enums;
 
 public enum ConvertMode {
     THRESHOLD,          // 全局固定阈值模式

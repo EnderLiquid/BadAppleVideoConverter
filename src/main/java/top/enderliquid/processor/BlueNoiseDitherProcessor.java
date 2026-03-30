@@ -1,4 +1,4 @@
-package top.enderliquid;
+package top.enderliquid.processor;
 
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;

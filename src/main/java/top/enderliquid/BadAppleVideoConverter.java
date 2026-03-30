@@ -7,6 +7,8 @@ import org.aeonbits.owner.ConfigFactory;
 import org.opencv.core.Mat;
 import org.opencv.videoio.VideoCapture;
 import org.opencv.videoio.Videoio;
+import top.enderliquid.enums.ConvertMode;
+import top.enderliquid.processor.*;
 
 import java.io.BufferedOutputStream;
 import java.io.FileOutputStream;

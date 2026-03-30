@@ -1,9 +1,11 @@
-package top.enderliquid;
+package top.enderliquid.processor;
 
 import org.opencv.core.Mat;
 import org.opencv.core.Size;
 import org.opencv.imgproc.CLAHE;
 import org.opencv.imgproc.Imgproc;
+import top.enderliquid.BadAppleVideoConverter;
+import top.enderliquid.utils.ImageUtils;
 
 public class FloydSteinbergProcessor implements FrameProcessor {
     private int targetWidth;

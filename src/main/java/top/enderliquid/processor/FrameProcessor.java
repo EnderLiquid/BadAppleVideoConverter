@@ -1,6 +1,7 @@
-package top.enderliquid;
+package top.enderliquid.processor;
 
 import org.opencv.core.Mat;
+import top.enderliquid.BadAppleVideoConverter;
 
 /**
  * 帧处理器接口

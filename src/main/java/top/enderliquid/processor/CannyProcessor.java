@@ -1,8 +1,9 @@
-package top.enderliquid;
+package top.enderliquid.processor;
 
 import org.opencv.core.Mat;
 import org.opencv.core.Size;
 import org.opencv.imgproc.Imgproc;
+import top.enderliquid.BadAppleVideoConverter;
 
 /**
  * Canny 边缘提取处理器
