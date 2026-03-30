@@ -1,6 +1,5 @@
 package top.enderliquid;
 
-import org.opencv.core.Core;
 import org.opencv.core.Mat;
 import org.opencv.core.Size;
 import org.opencv.imgproc.CLAHE;
@@ -56,7 +55,7 @@ public class FloydSteinbergProcessor implements FrameProcessor {
         }
         
         if (usmEnabled) {
-            applyUSM(grayFrame, usmRadius, usmAmount);
+            ImageUtils.applyUSM(grayFrame, usmRadius, usmAmount);
         }
         
         grayFrame.get(0, 0, rawPixels);
@@ -93,16 +92,6 @@ public class FloydSteinbergProcessor implements FrameProcessor {
     
     private int clamp(int value) {
         return Math.max(0, Math.min(255, value));
-    }
-    
-    private void applyUSM(Mat src, double radius, double amount) {
-        Mat blur = new Mat();
-        Imgproc.GaussianBlur(src, blur, new Size(0, 0), radius);
-        double alpha = 1.0 + amount;
-        double beta = -amount;
-        double gamma = 0.0;
-        Core.addWeighted(src, alpha, blur, beta, gamma, src);
-        blur.release();
     }
     
     @Override

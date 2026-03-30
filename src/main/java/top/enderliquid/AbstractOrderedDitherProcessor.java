@@ -68,7 +68,7 @@ public abstract class AbstractOrderedDitherProcessor implements FrameProcessor {
         }
         
         if (usmEnabled) {
-            applyUSM(grayFrame, usmRadius, usmAmount);
+            ImageUtils.applyUSM(grayFrame, usmRadius, usmAmount);
         }
         
         Core.compare(grayFrame, tiledThresholdMap, binaryResult, Core.CMP_GT);
@@ -76,16 +76,6 @@ public abstract class AbstractOrderedDitherProcessor implements FrameProcessor {
         binaryResult.get(0, 0, pixels);
         
         return pixels;
-    }
-    
-    protected void applyUSM(Mat src, double radius, double amount) {
-        Mat blur = new Mat();
-        Imgproc.GaussianBlur(src, blur, new Size(0, 0), radius);
-        double alpha = 1.0 + amount;
-        double beta = -amount;
-        double gamma = 0.0;
-        Core.addWeighted(src, alpha, blur, beta, gamma, src);
-        blur.release();
     }
     
     @Override

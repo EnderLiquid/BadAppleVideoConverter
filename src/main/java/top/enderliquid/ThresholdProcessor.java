@@ -1,6 +1,5 @@
 package top.enderliquid;
 
-import org.opencv.core.Core;
 import org.opencv.core.Mat;
 import org.opencv.core.Size;
 import org.opencv.imgproc.CLAHE;
@@ -54,7 +53,7 @@ public class ThresholdProcessor implements FrameProcessor {
         }
         
         if (usmEnabled) {
-            applyUSM(grayFrame, usmRadius, usmAmount);
+            ImageUtils.applyUSM(grayFrame, usmRadius, usmAmount);
         }
         
         Imgproc.threshold(grayFrame, binaryFrame, thresholdValue, 255, Imgproc.THRESH_BINARY);
@@ -62,16 +61,6 @@ public class ThresholdProcessor implements FrameProcessor {
         binaryFrame.get(0, 0, pixels);
         
         return pixels;
-    }
-    
-    private void applyUSM(Mat src, double radius, double amount) {
-        Mat blur = new Mat();
-        Imgproc.GaussianBlur(src, blur, new Size(0, 0), radius);
-        double alpha = 1.0 + amount;
-        double beta = -amount;
-        double gamma = 0.0;
-        Core.addWeighted(src, alpha, blur, beta, gamma, src);
-        blur.release();
     }
     
     @Override
