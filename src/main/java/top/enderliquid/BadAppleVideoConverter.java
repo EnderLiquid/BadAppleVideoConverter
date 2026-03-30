@@ -75,6 +75,18 @@ public class BadAppleVideoConverter {
                 invalidFields.add("cannyThreshold2");
             if (config.cannyApertureSize() != 3 && config.cannyApertureSize() != 5 && config.cannyApertureSize() != 7)
                 invalidFields.add("cannyApertureSize");
+            if (config.claheEnabled() == null)
+                invalidFields.add("claheEnabled");
+            if (config.claheClipLimit() == null || config.claheClipLimit() < 0)
+                invalidFields.add("claheClipLimit");
+            if (config.claheGridSize() == null || config.claheGridSize() < 1)
+                invalidFields.add("claheGridSize");
+            if (config.usmEnabled() == null)
+                invalidFields.add("usmEnabled");
+            if (config.usmRadius() == null || config.usmRadius() <= 0)
+                invalidFields.add("usmRadius");
+            if (config.usmAmount() == null || config.usmAmount() <= 0)
+                invalidFields.add("usmAmount");
             if (!invalidFields.isEmpty()) {
                 throw new RuntimeException(
                         String.format("配置参数错误: %s", String.join(", ", invalidFields))
@@ -187,7 +199,9 @@ public class BadAppleVideoConverter {
             // 根据 mode 选择处理器
             processor = switch (mode) {
                 case CANNY_EDGE -> new CannyProcessor();
-                case DITHER_BAYER -> new BayerProcessor();
+                case DITHER_BAYER -> new BayerDitherProcessor();
+                case DITHER_BLUE_NOISE -> new BlueNoiseDitherProcessor();
+                case DITHER_FS -> new FloydSteinbergProcessor();
                 default -> new ThresholdProcessor();
             };
             processor.init(targetWidth, targetHeight, config);
@@ -312,5 +326,23 @@ public class BadAppleVideoConverter {
 
         @DefaultValue("3")
         Integer cannyApertureSize();
+
+        @DefaultValue("false")
+        Boolean claheEnabled();
+
+        @DefaultValue("1.5")
+        Double claheClipLimit();
+
+        @DefaultValue("8")
+        Integer claheGridSize();
+
+        @DefaultValue("false")
+        Boolean usmEnabled();
+
+        @DefaultValue("1.0")
+        Double usmRadius();
+
+        @DefaultValue("1.2")
+        Double usmAmount();
     }
 }

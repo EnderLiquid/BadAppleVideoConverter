@@ -6,42 +6,56 @@ import org.opencv.core.Size;
 import org.opencv.imgproc.CLAHE;
 import org.opencv.imgproc.Imgproc;
 
-public class ThresholdProcessor implements FrameProcessor {
-    private int targetWidth;
-    private int targetHeight;
-    private double thresholdValue;
+public abstract class AbstractOrderedDitherProcessor implements FrameProcessor {
+    protected int targetWidth;
+    protected int targetHeight;
     
-    private Mat resizedFrame;
-    private Mat grayFrame;
-    private Mat binaryFrame;
-    private byte[] pixels;
+    protected Mat tiledThresholdMap;
+    protected Mat resizedFrame;
+    protected Mat grayFrame;
+    protected Mat binaryResult;
+    protected byte[] pixels;
     
-    private boolean claheEnabled;
-    private CLAHE clahe;
-    private boolean usmEnabled;
-    private double usmRadius;
-    private double usmAmount;
+    protected boolean claheEnabled;
+    protected CLAHE clahe;
+    protected boolean usmEnabled;
+    protected double usmRadius;
+    protected double usmAmount;
+    
+    protected abstract Mat createBasePattern();
     
     @Override
     public void init(int targetWidth, int targetHeight, BadAppleVideoConverter.ConvertConfig config) {
         this.targetWidth = targetWidth;
         this.targetHeight = targetHeight;
-        this.thresholdValue = config.thresholdValue();
         
         this.claheEnabled = config.claheEnabled();
         this.usmEnabled = config.usmEnabled();
         this.usmRadius = config.usmRadius();
         this.usmAmount = config.usmAmount();
         
+        Mat basePattern = createBasePattern();
+        
+        int repeatX = (int) Math.ceil((double) targetWidth / basePattern.cols());
+        int repeatY = (int) Math.ceil((double) targetHeight / basePattern.rows());
+        
+        Mat tiledPattern = new Mat();
+        Core.repeat(basePattern, repeatY, repeatX, tiledPattern);
+        
+        this.tiledThresholdMap = tiledPattern.submat(0, targetHeight, 0, targetWidth).clone();
+        
         this.resizedFrame = new Mat();
         this.grayFrame = new Mat();
-        this.binaryFrame = new Mat();
+        this.binaryResult = new Mat();
         this.pixels = new byte[targetWidth * targetHeight];
         
         if (claheEnabled) {
-            this.clahe = Imgproc.createCLAHE(config.claheClipLimit(),
+            this.clahe = Imgproc.createCLAHE(config.claheClipLimit(), 
                 new Size(config.claheGridSize(), config.claheGridSize()));
         }
+        
+        basePattern.release();
+        tiledPattern.release();
     }
     
     @Override
@@ -57,14 +71,14 @@ public class ThresholdProcessor implements FrameProcessor {
             applyUSM(grayFrame, usmRadius, usmAmount);
         }
         
-        Imgproc.threshold(grayFrame, binaryFrame, thresholdValue, 255, Imgproc.THRESH_BINARY);
+        Core.compare(grayFrame, tiledThresholdMap, binaryResult, Core.CMP_GT);
         
-        binaryFrame.get(0, 0, pixels);
+        binaryResult.get(0, 0, pixels);
         
         return pixels;
     }
     
-    private void applyUSM(Mat src, double radius, double amount) {
+    protected void applyUSM(Mat src, double radius, double amount) {
         Mat blur = new Mat();
         Imgproc.GaussianBlur(src, blur, new Size(0, 0), radius);
         double alpha = 1.0 + amount;
@@ -76,8 +90,9 @@ public class ThresholdProcessor implements FrameProcessor {
     
     @Override
     public void release() {
+        if (tiledThresholdMap != null) tiledThresholdMap.release();
         if (resizedFrame != null) resizedFrame.release();
         if (grayFrame != null) grayFrame.release();
-        if (binaryFrame != null) binaryFrame.release();
+        if (binaryResult != null) binaryResult.release();
     }
 }

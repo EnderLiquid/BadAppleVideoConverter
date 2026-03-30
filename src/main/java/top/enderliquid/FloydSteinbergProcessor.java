@@ -6,15 +6,15 @@ import org.opencv.core.Size;
 import org.opencv.imgproc.CLAHE;
 import org.opencv.imgproc.Imgproc;
 
-public class ThresholdProcessor implements FrameProcessor {
+public class FloydSteinbergProcessor implements FrameProcessor {
     private int targetWidth;
     private int targetHeight;
-    private double thresholdValue;
     
     private Mat resizedFrame;
     private Mat grayFrame;
-    private Mat binaryFrame;
-    private byte[] pixels;
+    private byte[] rawPixels;
+    private int[] grayPixels;
+    private byte[] outputPixels;
     
     private boolean claheEnabled;
     private CLAHE clahe;
@@ -26,7 +26,6 @@ public class ThresholdProcessor implements FrameProcessor {
     public void init(int targetWidth, int targetHeight, BadAppleVideoConverter.ConvertConfig config) {
         this.targetWidth = targetWidth;
         this.targetHeight = targetHeight;
-        this.thresholdValue = config.thresholdValue();
         
         this.claheEnabled = config.claheEnabled();
         this.usmEnabled = config.usmEnabled();
@@ -35,8 +34,11 @@ public class ThresholdProcessor implements FrameProcessor {
         
         this.resizedFrame = new Mat();
         this.grayFrame = new Mat();
-        this.binaryFrame = new Mat();
-        this.pixels = new byte[targetWidth * targetHeight];
+        
+        int pixelCount = targetWidth * targetHeight;
+        this.rawPixels = new byte[pixelCount];
+        this.grayPixels = new int[pixelCount];
+        this.outputPixels = new byte[pixelCount];
         
         if (claheEnabled) {
             this.clahe = Imgproc.createCLAHE(config.claheClipLimit(),
@@ -57,11 +59,40 @@ public class ThresholdProcessor implements FrameProcessor {
             applyUSM(grayFrame, usmRadius, usmAmount);
         }
         
-        Imgproc.threshold(grayFrame, binaryFrame, thresholdValue, 255, Imgproc.THRESH_BINARY);
+        grayFrame.get(0, 0, rawPixels);
         
-        binaryFrame.get(0, 0, pixels);
+        for (int i = 0; i < rawPixels.length; i++) {
+            grayPixels[i] = rawPixels[i] & 0xFF;
+        }
         
-        return pixels;
+        for (int y = 0; y < targetHeight; y++) {
+            for (int x = 0; x < targetWidth; x++) {
+                int idx = y * targetWidth + x;
+                int oldPixel = grayPixels[idx];
+                int newPixel = oldPixel > 127 ? 255 : 0;
+                outputPixels[idx] = (byte) newPixel;
+                int error = oldPixel - newPixel;
+                
+                if (x + 1 < targetWidth) {
+                    grayPixels[idx + 1] = clamp(grayPixels[idx + 1] + (error * 7) / 16);
+                }
+                if (y + 1 < targetHeight && x - 1 >= 0) {
+                    grayPixels[idx + targetWidth - 1] = clamp(grayPixels[idx + targetWidth - 1] + (error * 3) / 16);
+                }
+                if (y + 1 < targetHeight) {
+                    grayPixels[idx + targetWidth] = clamp(grayPixels[idx + targetWidth] + (error * 5) / 16);
+                }
+                if (y + 1 < targetHeight && x + 1 < targetWidth) {
+                    grayPixels[idx + targetWidth + 1] = clamp(grayPixels[idx + targetWidth + 1] + error / 16);
+                }
+            }
+        }
+        
+        return outputPixels;
+    }
+    
+    private int clamp(int value) {
+        return Math.max(0, Math.min(255, value));
     }
     
     private void applyUSM(Mat src, double radius, double amount) {
@@ -78,6 +109,5 @@ public class ThresholdProcessor implements FrameProcessor {
     public void release() {
         if (resizedFrame != null) resizedFrame.release();
         if (grayFrame != null) grayFrame.release();
-        if (binaryFrame != null) binaryFrame.release();
     }
 }
