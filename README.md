@@ -70,7 +70,7 @@ CLAHE（对比度受限自适应直方图均衡化）可增强图像对比度，
 ```properties
 # 是否启用 CLAHE 预处理
 # Canny 模式强制禁用此选项
-claheEnabled=false
+claheEnabled=true
 
 # 对比度限制
 # 范围: ≥0，0 或负值表示无限制
@@ -90,7 +90,7 @@ USM（反锐化掩膜）可增强图像边缘锐度。
 ```properties
 # 是否启用 USM 锐化预处理
 # Canny 模式强制禁用此选项
-usmEnabled=false
+usmEnabled=true
 
 # 模糊半径
 # 范围: >0

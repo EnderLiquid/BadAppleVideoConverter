@@ -327,7 +327,7 @@ public class BadAppleVideoConverter {
         @DefaultValue("3")
         Integer cannyApertureSize();
 
-        @DefaultValue("false")
+        @DefaultValue("true")
         Boolean claheEnabled();
 
         @DefaultValue("1.5")
@@ -336,7 +336,7 @@ public class BadAppleVideoConverter {
         @DefaultValue("8")
         Integer claheGridSize();
 
-        @DefaultValue("false")
+        @DefaultValue("true")
         Boolean usmEnabled();
 
         @DefaultValue("1.0")
