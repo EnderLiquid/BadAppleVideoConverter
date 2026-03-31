@@ -25,6 +25,7 @@ public class CannyProcessor implements FrameProcessor {
     private int aperture;         // Sobel 算子的孔径大小
     private boolean blurEnabled;  // 是否启用高斯预模糊
     private int blurSize;         // 高斯模糊核大小
+    private boolean L2gradient;   // 是否使用 L2 范数计算梯度
 
     @Override
     public void init(int targetWidth, int targetHeight, BadAppleVideoConverter.ConvertConfig config) {
@@ -37,6 +38,7 @@ public class CannyProcessor implements FrameProcessor {
         this.aperture = config.cannyApertureSize();
         this.blurEnabled = config.cannyBlurEnabled();
         this.blurSize = config.cannyBlurSize();
+        this.L2gradient = config.cannyL2Gradient();
 
         // 膨胀核大小
         int dilateSize = config.cannyDilateSize();
@@ -66,7 +68,7 @@ public class CannyProcessor implements FrameProcessor {
             if (blurEnabled) {
                 Imgproc.GaussianBlur(grayFrame, grayFrame, new Size(blurSize, blurSize), 0);
             }
-            Imgproc.Canny(grayFrame, edgesFrame, threshold1, threshold2, aperture);
+            Imgproc.Canny(grayFrame, edgesFrame, threshold1, threshold2, aperture, L2gradient);
 
             if (dilate) {
                 Imgproc.dilate(edgesFrame, edgesFrame, dilateKernel);
@@ -80,7 +82,7 @@ public class CannyProcessor implements FrameProcessor {
             if (blurEnabled) {
                 Imgproc.GaussianBlur(grayFrame, grayFrame, new Size(blurSize, blurSize), 0);
             }
-            Imgproc.Canny(grayFrame, edgesFrame, threshold1, threshold2, aperture);
+            Imgproc.Canny(grayFrame, edgesFrame, threshold1, threshold2, aperture, L2gradient);
 
             if (dilate) {
                 Imgproc.dilate(edgesFrame, edgesFrame, dilateKernel);

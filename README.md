@@ -142,6 +142,11 @@ cannyBlurEnabled=true
 # 范围: 正奇数 (3, 5, 7...)
 # 值越大，模糊程度越高，边缘越平滑
 cannyBlurSize=3
+
+# 是否使用 L2 范数计算梯度
+# true: 使用更精确的 L2 范数 (√(Gx²+Gy²))，边缘检测更精确但计算稍慢
+# false: 使用近似的 L1 范数 (|Gx|+|Gy|)，计算更快（默认）
+cannyL2Gradient=false
 ```
 
 ## 输出格式
