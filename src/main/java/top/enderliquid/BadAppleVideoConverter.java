@@ -77,6 +77,10 @@ public class BadAppleVideoConverter {
                 invalidFields.add("cannyThreshold2");
             if (config.cannyApertureSize() != 3 && config.cannyApertureSize() != 5 && config.cannyApertureSize() != 7)
                 invalidFields.add("cannyApertureSize");
+            if (config.cannyBlurEnabled() == null)
+                invalidFields.add("cannyBlurEnabled");
+            if (config.cannyBlurSize() == null || config.cannyBlurSize() < 1 || config.cannyBlurSize() % 2 == 0)
+                invalidFields.add("cannyBlurSize");
             if (config.claheEnabled() == null)
                 invalidFields.add("claheEnabled");
             if (config.claheClipLimit() == null || config.claheClipLimit() < 0)
@@ -328,6 +332,12 @@ public class BadAppleVideoConverter {
 
         @DefaultValue("3")
         Integer cannyApertureSize();
+
+        @DefaultValue("true")
+        Boolean cannyBlurEnabled();
+
+        @DefaultValue("3")
+        Integer cannyBlurSize();
 
         @DefaultValue("true")
         Boolean claheEnabled();

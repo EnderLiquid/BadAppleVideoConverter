@@ -23,6 +23,8 @@ public class CannyProcessor implements FrameProcessor {
     private double threshold1;       // Canny 低阈值
     private double threshold2;       // Canny 高阈值
     private int aperture;         // Sobel 算子的孔径大小
+    private boolean blurEnabled;  // 是否启用高斯预模糊
+    private int blurSize;         // 高斯模糊核大小
 
     @Override
     public void init(int targetWidth, int targetHeight, BadAppleVideoConverter.ConvertConfig config) {
@@ -33,6 +35,8 @@ public class CannyProcessor implements FrameProcessor {
         this.threshold1 = config.cannyThreshold1();
         this.threshold2 = config.cannyThreshold2();
         this.aperture = config.cannyApertureSize();
+        this.blurEnabled = config.cannyBlurEnabled();
+        this.blurSize = config.cannyBlurSize();
 
         // 膨胀核大小
         int dilateSize = config.cannyDilateSize();
@@ -59,6 +63,9 @@ public class CannyProcessor implements FrameProcessor {
             // resize(srcFrame, resizedFrameBGR) -> cvtColor -> Canny -> dilate? -> get
             Imgproc.resize(srcFrame, resizedFrameBGR, new Size(targetWidth, targetHeight));
             Imgproc.cvtColor(resizedFrameBGR, grayFrame, Imgproc.COLOR_BGR2GRAY);
+            if (blurEnabled) {
+                Imgproc.GaussianBlur(grayFrame, grayFrame, new Size(blurSize, blurSize), 0);
+            }
             Imgproc.Canny(grayFrame, edgesFrame, threshold1, threshold2, aperture);
 
             if (dilate) {
@@ -70,6 +77,9 @@ public class CannyProcessor implements FrameProcessor {
             // 分支 B: 先 Canny 后缩放
             // cvtColor(srcFrame) -> Canny -> dilate? -> resize -> threshold(127) -> get
             Imgproc.cvtColor(srcFrame, grayFrame, Imgproc.COLOR_BGR2GRAY);
+            if (blurEnabled) {
+                Imgproc.GaussianBlur(grayFrame, grayFrame, new Size(blurSize, blurSize), 0);
+            }
             Imgproc.Canny(grayFrame, edgesFrame, threshold1, threshold2, aperture);
 
             if (dilate) {
