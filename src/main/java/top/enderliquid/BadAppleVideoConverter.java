@@ -335,7 +335,7 @@ public class BadAppleVideoConverter {
         @DefaultValue("1.5")
         Double claheClipLimit();
 
-        @DefaultValue("8")
+        @DefaultValue("4")
         Integer claheGridSize();
 
         @DefaultValue("true")
