@@ -5,12 +5,14 @@ import org.aeonbits.owner.Accessible;
 import org.aeonbits.owner.Config;
 import org.aeonbits.owner.ConfigFactory;
 import org.opencv.core.Mat;
-import org.opencv.core.Size;
-import org.opencv.imgproc.Imgproc;
 import org.opencv.videoio.VideoCapture;
 import org.opencv.videoio.Videoio;
+import top.enderliquid.enums.ConvertMode;
+import top.enderliquid.processor.*;
 
-import java.io.*;
+import java.io.BufferedOutputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.file.Files;
@@ -27,32 +29,10 @@ public class BadAppleVideoConverter {
     public static final int MAX_WIDTH = 8192;
     public static final int MAX_HEIGHT = 8192;
     public static final int MAX_FPS = 240;
-    public static final double DEFAULT_THRESHOLD = 127.00;
     public static final String CONFIG_PATH = "./config.properties";
-    public static final String DEFAULT_INPUT_PATH = "./input/bad_apple.mp4";
-    public static final String DEFAULT_OUTPUT_PATH = "./output/bad_apple_video.bin";
-    public static final int DEFAULT_TARGET_WIDTH = 88;
-    public static final int DEFAULT_TARGET_HEIGHT = 64;
-    public static final double DEFAULT_TARGET_FPS = 30.00;
 
     static {
         OpenCV.loadLocally();
-    }
-
-    @Config.Sources({"file:" + CONFIG_PATH})
-    public interface ConvertConfig extends Accessible {
-        @DefaultValue(DEFAULT_INPUT_PATH)
-        String inputPath();
-        @DefaultValue(DEFAULT_OUTPUT_PATH)
-        String outputPath();
-        @DefaultValue("" + DEFAULT_TARGET_WIDTH)
-        Integer targetWidth();
-        @DefaultValue("" + DEFAULT_TARGET_HEIGHT)
-        Integer targetHeight();
-        @DefaultValue("" + DEFAULT_TARGET_FPS)
-        Double targetFps();
-        @DefaultValue("" + DEFAULT_THRESHOLD)
-        Double thresholdValue();
     }
 
     private static ConvertConfig initConfig() {
@@ -73,13 +53,48 @@ public class BadAppleVideoConverter {
             }
             // 校验配置参数
             List<String> invalidFields = new ArrayList<>();
-            if (config.inputPath() == null) invalidFields.add("inputPath");
-            if (config.outputPath() == null) invalidFields.add("outputPath");
-            if (config.targetWidth() == null || config.targetWidth() < 1) invalidFields.add("targetWidth");
-            if (config.targetHeight() == null || config.targetHeight() < 1) invalidFields.add("targetHeight");
-            if (config.targetFps() == null || config.targetFps() <= 0) invalidFields.add("targetFps");
+            if (config.inputPath() == null || config.inputPath().isBlank())
+                invalidFields.add("inputPath");
+            if (config.outputPath() == null || config.outputPath().isBlank())
+                invalidFields.add("outputPath");
+            if (config.targetWidth() == null || config.targetWidth() < 1)
+                invalidFields.add("targetWidth");
+            if (config.targetHeight() == null || config.targetHeight() < 1)
+                invalidFields.add("targetHeight");
+            if (config.targetFps() == null || config.targetFps() <= 0)
+                invalidFields.add("targetFps");
+            if (config.mode() == null)
+                invalidFields.add("mode");
             if (config.thresholdValue() == null || config.thresholdValue() < 0 || config.thresholdValue() > 255)
                 invalidFields.add("thresholdValue");
+            if (config.cannyDilate() == null)
+                invalidFields.add("cannyDilate");
+            if (config.cannyDilateSize() == null || config.cannyDilateSize() < 2)
+                invalidFields.add("cannyDilateSize");
+            if (config.cannyThreshold1() == null || config.cannyThreshold1() < 0 || config.cannyThreshold1() > 255)
+                invalidFields.add("cannyThreshold1");
+            if (config.cannyThreshold2() == null || config.cannyThreshold2() < 0 || config.cannyThreshold2() > 255)
+                invalidFields.add("cannyThreshold2");
+            if (config.cannyApertureSize() != 3 && config.cannyApertureSize() != 5 && config.cannyApertureSize() != 7)
+                invalidFields.add("cannyApertureSize");
+            if (config.cannyBlurEnabled() == null)
+                invalidFields.add("cannyBlurEnabled");
+            if (config.cannyBlurSize() == null || config.cannyBlurSize() < 1 || config.cannyBlurSize() % 2 == 0)
+                invalidFields.add("cannyBlurSize");
+            if (config.cannyL2Gradient() == null)
+                invalidFields.add("cannyL2Gradient");
+            if (config.claheEnabled() == null)
+                invalidFields.add("claheEnabled");
+            if (config.claheClipLimit() == null || config.claheClipLimit() < 0)
+                invalidFields.add("claheClipLimit");
+            if (config.claheGridSize() == null || config.claheGridSize() < 1)
+                invalidFields.add("claheGridSize");
+            if (config.usmEnabled() == null)
+                invalidFields.add("usmEnabled");
+            if (config.usmRadius() == null || config.usmRadius() <= 0)
+                invalidFields.add("usmRadius");
+            if (config.usmAmount() == null || config.usmAmount() <= 0)
+                invalidFields.add("usmAmount");
             if (!invalidFields.isEmpty()) {
                 throw new RuntimeException(
                         String.format("配置参数错误: %s", String.join(", ", invalidFields))
@@ -96,7 +111,7 @@ public class BadAppleVideoConverter {
     public static void main(String[] args) {
         try {
             ConvertConfig config = initConfig();
-            convertVideoToFile(config.inputPath(), config.outputPath(), config.targetWidth(), config.targetHeight(), config.targetFps(), config.thresholdValue());
+            convertVideoToFile(config);
         } catch (RuntimeException e) {
             System.err.printf("错误: %s%n%s",
                     e.getMessage(),
@@ -117,15 +132,15 @@ public class BadAppleVideoConverter {
      * [8-11]  Float FPS
      * [12-15] Int   FrameCount
      * [16-N]  Bytes Frame Data (每帧固定字节数)
-     *
-     * @param inputPath      视频路径
-     * @param outputPath     输出的 .bin 文件路径
-     * @param targetWidth    目标宽度
-     * @param targetHeight   目标高度
-     * @param targetFps      目标帧率
-     * @param thresholdValue 二值化阈值
      */
-    public static void convertVideoToFile(String inputPath, String outputPath, int targetWidth, int targetHeight, double targetFps, double thresholdValue) {
+    public static void convertVideoToFile(ConvertConfig config) {
+        String inputPath = config.inputPath();
+        String outputPath = config.outputPath();
+        int targetWidth = config.targetWidth();
+        int targetHeight = config.targetHeight();
+        double targetFps = config.targetFps();
+        ConvertMode mode = config.mode();
+
         Path inputFilePath, outputFilePath;
         try {
             inputFilePath = Paths.get(inputPath);
@@ -135,6 +150,7 @@ public class BadAppleVideoConverter {
         }
         System.out.printf("源路径: %s%n", inputPath);
         System.out.printf("目标路径: %s%n", outputPath);
+        System.out.printf("处理模式: %s%n", mode);
         if (!Files.exists(inputFilePath)) {
             throw new RuntimeException("源文件不存在");
         }
@@ -167,85 +183,96 @@ public class BadAppleVideoConverter {
         // 计算总帧数
         double duration = srcTotalFrames / srcFps;
         int targetTotalFrames = (int) (duration * targetFps);
-        Mat frame = new Mat();
-        Mat resizedFrame = new Mat();
-        Mat grayFrame = new Mat();
-        Mat binaryFrame = new Mat();
-        // 用于读取像素数据的临时数组
-        byte[] pixels = new byte[targetWidth * targetHeight];
+
         // 计算每一帧在二进制文件中占用的字节数 (向上取整)
         int bytesPerFrame = (targetWidth * targetHeight + 7) / 8;
-        // 实际写入文件的位打包数组
-        byte[] packedBytes = new byte[bytesPerFrame];
+
         System.out.println("开始处理...");
         System.out.printf("源: %d * %d @ %.2f fps, 总帧数: %d%n", srcWidth, srcHeight, srcFps, srcTotalFrames);
         System.out.printf("目标: %d * %d @ %.2f fps, 总帧数: %d%n", targetWidth, targetHeight, targetFps, targetTotalFrames);
-        System.out.printf("二值化阈值: %.2f%n", thresholdValue);
         System.out.printf("每帧数据大小: %d bytes%n", bytesPerFrame);
+
         try {
             Files.createDirectories(outputFilePath.getParent());
         } catch (IOException e) {
             throw new RuntimeException("创建目标路径失败", e);
         }
-        // 使用 BufferedOutputStream 写入二进制文件
-        try (BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(outputFilePath.toFile()))) {
-            // 写入文件头 (Header)
-            ByteBuffer buffer = ByteBuffer.allocate(16);
-            buffer.order(ByteOrder.LITTLE_ENDIAN); // 小端模式输出
-            buffer.putInt(targetWidth); // 宽 (4 bytes)
-            buffer.putInt(targetHeight); // 高 (4 bytes)
-            buffer.putFloat((float) targetFps); // FPS (4 bytes, 使用float兼容C语言)
-            buffer.putInt(targetTotalFrames); // 总帧数 (4 bytes)
-            bos.write(buffer.array());
-            for (int i = 1; i <= targetTotalFrames; i++) {
-                // 计算源帧的索引
-                int currentFrameIndex = i - 1;
-                double currentTime = currentFrameIndex / targetFps;
-                int srcFrameIndex = (int) (currentTime * srcFps);
-                capture.set(Videoio.CAP_PROP_POS_FRAMES, srcFrameIndex);
-                // 重置位打包数组
-                Arrays.fill(packedBytes, (byte) 0);
-                if (capture.read(frame) && !frame.empty()) {
-                    // 1. 缩放
-                    Imgproc.resize(frame, resizedFrame, new Size(targetWidth, targetHeight));
-                    // 2. 转换为灰度图
-                    Imgproc.cvtColor(resizedFrame, grayFrame, Imgproc.COLOR_BGR2GRAY);
-                    // 3. 二值化 (阈值128, 0黑 255白)
-                    Imgproc.threshold(grayFrame, binaryFrame, thresholdValue, 255, Imgproc.THRESH_BINARY);
-                    // 4. 获取像素数据 (覆盖临时数组原有内容)
-                    binaryFrame.get(0, 0, pixels);
-                    // 5. 位打包
-                    for (int p = 0; p < pixels.length; p++) {
-                        // 将有符号byte (-128 - 127) 转换为无符号int (0 - 255)
-                        int val = pixels[p] & 0xFF;
-                        // 逻辑: 白色为1, 黑色为0
-                        if (val == 255) {
-                            // 计算当前像素属于哪个 byte (p / 8) 以及该 byte 中的哪一位 (p % 8)
-                            int byteIndex = p / 8;
-                            int bitIndex = p % 8;
-                            // 使用位运算将位打包数组对应位置 1 (位序为LSB First)
-                            packedBytes[byteIndex] |= (byte) (1 << bitIndex);
+
+        // 策略选择与初始化 (在外层 try-finally 中确保资源释放)
+        FrameProcessor processor = null;
+        Mat frame = new Mat();
+        byte[] packedBytes = new byte[bytesPerFrame];
+
+        try {
+            // 根据 mode 选择处理器
+            processor = switch (mode) {
+                case CANNY_EDGE -> new CannyProcessor();
+                case DITHER_BAYER -> new BayerDitherProcessor();
+                case DITHER_BLUE_NOISE -> new BlueNoiseDitherProcessor();
+                case DITHER_FS -> new FloydSteinbergProcessor();
+                default -> new ThresholdProcessor();
+            };
+            processor.init(targetWidth, targetHeight, config);
+
+            // 文件写入
+            try (BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(outputFilePath.toFile()))) {
+                // 写入文件头 (Header)
+                ByteBuffer buffer = ByteBuffer.allocate(16);
+                buffer.order(ByteOrder.LITTLE_ENDIAN); // 小端模式输出
+                buffer.putInt(targetWidth); // 宽 (4 bytes)
+                buffer.putInt(targetHeight); // 高 (4 bytes)
+                buffer.putFloat((float) targetFps); // FPS (4 bytes, 使用float兼容C语言)
+                buffer.putInt(targetTotalFrames); // 总帧数 (4 bytes)
+                bos.write(buffer.array());
+
+                for (int i = 1; i <= targetTotalFrames; i++) {
+                    // 计算源帧的索引
+                    int currentFrameIndex = i - 1;
+                    double currentTime = currentFrameIndex / targetFps;
+                    int srcFrameIndex = (int) (currentTime * srcFps);
+                    capture.set(Videoio.CAP_PROP_POS_FRAMES, srcFrameIndex);
+
+                    // 重置位打包数组
+                    Arrays.fill(packedBytes, (byte) 0);
+
+                    if (capture.read(frame) && !frame.empty()) {
+                        // 调用策略类处理，获取非0即255的 byte 数组
+                        byte[] binaryPixels = processor.process(frame);
+
+                        // 统一的位打包逻辑 (Bit-packing)
+                        for (int p = 0; p < binaryPixels.length; p++) {
+                            // 将有符号byte (-128 - 127) 转换为无符号int (0 - 255)
+                            int val = binaryPixels[p] & 0xFF;
+                            // 逻辑: 白色为1, 黑色为0
+                            if (val == 255) {
+                                // 计算当前像素属于哪个 byte (p / 8) 以及该 byte 中的哪一位 (p % 8)
+                                int byteIndex = p / 8;
+                                int bitIndex = p % 8;
+                                // 使用位运算将位打包数组对应位置 1 (位序为LSB First)
+                                packedBytes[byteIndex] |= (byte) (1 << bitIndex);
+                            }
                         }
+                    } else {
+                        System.err.printf("警告: %d / %d 帧为空帧%n", i, targetTotalFrames);
                     }
-                } else {
-                    System.err.printf("警告: %d / %d 帧为空帧%n", i, targetTotalFrames);
+
+                    // 将位打包数组写入文件
+                    bos.write(packedBytes);
+
+                    // 控制台帧预览与进度播报
+                    if (i == 1 || i % 100 == 0 || i == targetTotalFrames) {
+                        printFrameFromBytes(packedBytes, targetWidth, targetHeight);
+                        System.out.printf("已处理: %d / %d 帧%n", i, targetTotalFrames);
+                    }
                 }
-                // 6. 将位打包数组写入文件
-                bos.write(packedBytes);
-                // 7. 控制台帧预览与进度播报
-                if (i == 1 || i % 100 == 0 || i == targetTotalFrames) {
-                    printFrameFromBytes(packedBytes, targetWidth, targetHeight);
-                    System.out.printf("已处理: %d / %d 帧%n", i, targetTotalFrames);
-                }
+                System.out.println("文件写入完成: " + outputFilePath);
+            } catch (IOException e) {
+                throw new RuntimeException("文件读写发生错误", e);
             }
-            System.out.println("文件写入完成: " + outputFilePath);
-        } catch (IOException e) {
-            throw new RuntimeException("文件读写发生错误", e);
         } finally {
+            // 统一释放资源
+            if (processor != null) processor.release();
             frame.release();
-            resizedFrame.release();
-            grayFrame.release();
-            binaryFrame.release();
             capture.release();
         }
     }
@@ -265,5 +292,74 @@ public class BadAppleVideoConverter {
             }
             System.out.println();
         }
+    }
+
+    @Config.Sources({"file:" + CONFIG_PATH})
+    public interface ConvertConfig extends Accessible {
+        @DefaultValue("./input/bad_apple.mp4")
+        String inputPath();
+
+        @DefaultValue("./output/bad_apple_video.bin")
+        String outputPath();
+
+        @DefaultValue("88")
+        Integer targetWidth();
+
+        @DefaultValue("64")
+        Integer targetHeight();
+
+        @DefaultValue("30.00")
+        Double targetFps();
+
+        @DefaultValue("THRESHOLD")
+        ConvertMode mode();
+
+        @DefaultValue("127.00")
+        Double thresholdValue();
+
+        @DefaultValue("true")
+        Boolean cannyPreScale();
+
+        @DefaultValue("false")
+        Boolean cannyDilate();
+
+        @DefaultValue("2")
+        Integer cannyDilateSize();
+
+        @DefaultValue("50.00")
+        Double cannyThreshold1();
+
+        @DefaultValue("150.00")
+        Double cannyThreshold2();
+
+        @DefaultValue("3")
+        Integer cannyApertureSize();
+
+        @DefaultValue("true")
+        Boolean cannyBlurEnabled();
+
+        @DefaultValue("3")
+        Integer cannyBlurSize();
+
+        @DefaultValue("true")
+        Boolean cannyL2Gradient();
+
+        @DefaultValue("true")
+        Boolean claheEnabled();
+
+        @DefaultValue("1.5")
+        Double claheClipLimit();
+
+        @DefaultValue("4")
+        Integer claheGridSize();
+
+        @DefaultValue("true")
+        Boolean usmEnabled();
+
+        @DefaultValue("1.0")
+        Double usmRadius();
+
+        @DefaultValue("1.2")
+        Double usmAmount();
     }
 }
