@@ -8,7 +8,8 @@ import org.opencv.imgproc.Imgproc;
 public final class ImageUtils {
     
     private ImageUtils() {}
-    
+
+    // USM 锐化
     public static void applyUSM(Mat src, double radius, double amount) {
         Mat blur = new Mat();
         Imgproc.GaussianBlur(src, blur, new Size(0, 0), radius);

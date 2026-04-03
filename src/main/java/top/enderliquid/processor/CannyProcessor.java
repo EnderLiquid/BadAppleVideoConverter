@@ -62,7 +62,6 @@ public class CannyProcessor implements FrameProcessor {
     public byte[] process(Mat srcFrame) {
         if (preScale) {
             // 分支 A: 先缩放后 Canny
-            // resize(srcFrame, resizedFrameBGR) -> cvtColor -> Canny -> dilate? -> get
             Imgproc.resize(srcFrame, resizedFrameBGR, new Size(targetWidth, targetHeight));
             Imgproc.cvtColor(resizedFrameBGR, grayFrame, Imgproc.COLOR_BGR2GRAY);
             if (blurEnabled) {
@@ -77,7 +76,6 @@ public class CannyProcessor implements FrameProcessor {
             edgesFrame.get(0, 0, pixels);
         } else {
             // 分支 B: 先 Canny 后缩放
-            // cvtColor(srcFrame) -> Canny -> dilate? -> resize -> threshold(127) -> get
             Imgproc.cvtColor(srcFrame, grayFrame, Imgproc.COLOR_BGR2GRAY);
             if (blurEnabled) {
                 Imgproc.GaussianBlur(grayFrame, grayFrame, new Size(blurSize, blurSize), 0);

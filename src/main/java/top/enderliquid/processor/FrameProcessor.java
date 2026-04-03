@@ -5,10 +5,9 @@ import top.enderliquid.BadAppleVideoConverter;
 
 /**
  * 帧处理器接口
- * 所有返回值 byte[] 必须且只能包含 0 (黑) 或 255 (白) 两种值，长度必须等于 targetWidth * targetHeight
- * 关键约束:
+ * 资源管理:
  * - srcFrame 由调用方管理，Processor 不得修改或释放 srcFrame，仅读取其数据
- * - 内部 Mat 对象在 process() 结束后不应被外部引用，生命周期由 Processor 自行管理
+ * - 内部 Mat 对象由 Processor 自行管理，在 release() 方法中释放
  */
 public interface FrameProcessor {
     /**

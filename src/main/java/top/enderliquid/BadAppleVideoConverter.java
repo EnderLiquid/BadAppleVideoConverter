@@ -35,10 +35,79 @@ public class BadAppleVideoConverter {
         OpenCV.loadLocally();
     }
 
+    @Config.Sources({"file:" + CONFIG_PATH})
+    public interface ConvertConfig extends Accessible {
+        @DefaultValue("./input/bad_apple.mp4")
+        String inputPath();
+
+        @DefaultValue("./output/bad_apple_video.bin")
+        String outputPath();
+
+        @DefaultValue("88")
+        Integer targetWidth();
+
+        @DefaultValue("64")
+        Integer targetHeight();
+
+        @DefaultValue("30.00")
+        Double targetFps();
+
+        @DefaultValue("THRESHOLD")
+        ConvertMode mode();
+
+        @DefaultValue("127.00")
+        Double thresholdValue();
+
+        @DefaultValue("true")
+        Boolean cannyPreScale();
+
+        @DefaultValue("false")
+        Boolean cannyDilate();
+
+        @DefaultValue("2")
+        Integer cannyDilateSize();
+
+        @DefaultValue("50.00")
+        Double cannyThreshold1();
+
+        @DefaultValue("150.00")
+        Double cannyThreshold2();
+
+        @DefaultValue("3")
+        Integer cannyApertureSize();
+
+        @DefaultValue("true")
+        Boolean cannyBlurEnabled();
+
+        @DefaultValue("3")
+        Integer cannyBlurSize();
+
+        @DefaultValue("true")
+        Boolean cannyL2Gradient();
+
+        @DefaultValue("true")
+        Boolean claheEnabled();
+
+        @DefaultValue("1.5")
+        Double claheClipLimit();
+
+        @DefaultValue("4")
+        Integer claheGridSize();
+
+        @DefaultValue("true")
+        Boolean usmEnabled();
+
+        @DefaultValue("1.0")
+        Double usmRadius();
+
+        @DefaultValue("1.2")
+        Double usmAmount();
+    }
+
     private static ConvertConfig initConfig() {
         try {
             Path configFilePath = Paths.get(CONFIG_PATH);
-            // 创建配置实例（如果文件不存在，此时里面装的都是 @DefaultValue 的值）
+            // 创建配置实例（如果文件不存在，此时里面装的都是默认值）
             ConvertConfig config = ConfigFactory.create(ConvertConfig.class);
             if (!Files.exists(configFilePath)) {
                 // 确保目录存在
@@ -198,13 +267,12 @@ public class BadAppleVideoConverter {
             throw new RuntimeException("创建目标路径失败", e);
         }
 
-        // 策略选择与初始化 (在外层 try-finally 中确保资源释放)
         FrameProcessor processor = null;
         Mat frame = new Mat();
         byte[] packedBytes = new byte[bytesPerFrame];
 
         try {
-            // 根据 mode 选择处理器
+            // 策略模式：根据配置获取帧处理器实例
             processor = switch (mode) {
                 case CANNY_EDGE -> new CannyProcessor();
                 case DITHER_BAYER -> new BayerDitherProcessor();
@@ -239,7 +307,7 @@ public class BadAppleVideoConverter {
                         // 调用策略类处理，获取非0即255的 byte 数组
                         byte[] binaryPixels = processor.process(frame);
 
-                        // 统一的位打包逻辑 (Bit-packing)
+                        // 位打包
                         for (int p = 0; p < binaryPixels.length; p++) {
                             // 将有符号byte (-128 - 127) 转换为无符号int (0 - 255)
                             int val = binaryPixels[p] & 0xFF;
@@ -292,74 +360,5 @@ public class BadAppleVideoConverter {
             }
             System.out.println();
         }
-    }
-
-    @Config.Sources({"file:" + CONFIG_PATH})
-    public interface ConvertConfig extends Accessible {
-        @DefaultValue("./input/bad_apple.mp4")
-        String inputPath();
-
-        @DefaultValue("./output/bad_apple_video.bin")
-        String outputPath();
-
-        @DefaultValue("88")
-        Integer targetWidth();
-
-        @DefaultValue("64")
-        Integer targetHeight();
-
-        @DefaultValue("30.00")
-        Double targetFps();
-
-        @DefaultValue("THRESHOLD")
-        ConvertMode mode();
-
-        @DefaultValue("127.00")
-        Double thresholdValue();
-
-        @DefaultValue("true")
-        Boolean cannyPreScale();
-
-        @DefaultValue("false")
-        Boolean cannyDilate();
-
-        @DefaultValue("2")
-        Integer cannyDilateSize();
-
-        @DefaultValue("50.00")
-        Double cannyThreshold1();
-
-        @DefaultValue("150.00")
-        Double cannyThreshold2();
-
-        @DefaultValue("3")
-        Integer cannyApertureSize();
-
-        @DefaultValue("true")
-        Boolean cannyBlurEnabled();
-
-        @DefaultValue("3")
-        Integer cannyBlurSize();
-
-        @DefaultValue("true")
-        Boolean cannyL2Gradient();
-
-        @DefaultValue("true")
-        Boolean claheEnabled();
-
-        @DefaultValue("1.5")
-        Double claheClipLimit();
-
-        @DefaultValue("4")
-        Integer claheGridSize();
-
-        @DefaultValue("true")
-        Boolean usmEnabled();
-
-        @DefaultValue("1.0")
-        Double usmRadius();
-
-        @DefaultValue("1.2")
-        Double usmAmount();
     }
 }
